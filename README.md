@@ -1,0 +1,3 @@
+# BrainwaveVST
+
+JUCE project template.
