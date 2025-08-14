@@ -1,0 +1,22 @@
+# Build artifacts
+build/
+JUCE/
+*.user
+*.suo
+*.sdf
+*.pdb
+*.opendb
+*.VC.db
+.vscode/
+.idea/
+# CMake
+CMakeCache.txt
+CMakeFiles/
+*.cmake
+cmake-build-*/
+Makefile
+# Visual Studio
+*.vcxproj*
+*.sln
+# MacOS
+.DS_Store

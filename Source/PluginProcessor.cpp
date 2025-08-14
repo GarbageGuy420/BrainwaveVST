@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include <vector>
 
 BrainwaveVSTAudioProcessor::BrainwaveVSTAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -12,6 +13,7 @@ BrainwaveVSTAudioProcessor::BrainwaveVSTAudioProcessor()
 #endif
                        )
 #endif
+    , apvts(*this, nullptr, "Parameters", createParameterLayout())
 {
 }
 
@@ -65,8 +67,9 @@ void BrainwaveVSTAudioProcessor::changeProgramName (int, const juce::String&)
 {
 }
 
-void BrainwaveVSTAudioProcessor::prepareToPlay (double, int)
+void BrainwaveVSTAudioProcessor::prepareToPlay (double sampleRate, int)
 {
+    oscillator.prepare(sampleRate);
 }
 
 void BrainwaveVSTAudioProcessor::releaseResources()
@@ -95,11 +98,21 @@ bool BrainwaveVSTAudioProcessor::isBusesLayoutSupported (const BusesLayout& layo
 void BrainwaveVSTAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
-    auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
+    auto numSamples = buffer.getNumSamples();
 
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, buffer.getNumSamples());
+    buffer.clear();
+
+    auto gain = apvts.getRawParameterValue("GAIN")->load();
+    auto freq = apvts.getRawParameterValue("FREQ")->load();
+    oscillator.setFrequency(freq);
+
+    for (int sample = 0; sample < numSamples; ++sample)
+    {
+        auto value = oscillator.getNextSample() * gain;
+        for (int channel = 0; channel < totalNumOutputChannels; ++channel)
+            buffer.setSample(channel, sample, value);
+    }
 }
 
 bool BrainwaveVSTAudioProcessor::hasEditor() const
@@ -112,12 +125,32 @@ juce::AudioProcessorEditor* BrainwaveVSTAudioProcessor::createEditor()
     return new BrainwaveVSTAudioProcessorEditor (*this);
 }
 
-void BrainwaveVSTAudioProcessor::getStateInformation (juce::MemoryBlock&)
+void BrainwaveVSTAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
+    if (auto xml = apvts.copyState().createXml())
+        copyXmlToBinary(*xml, destData);
 }
 
-void BrainwaveVSTAudioProcessor::setStateInformation (const void*, int)
+void BrainwaveVSTAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
+    if (auto xmlState = getXmlFromBinary(data, sizeInBytes))
+        if (xmlState->hasTagName(apvts.state.getType()))
+            apvts.replaceState(juce::ValueTree::fromXml(*xmlState));
+}
+
+juce::AudioProcessorValueTreeState::ParameterLayout BrainwaveVSTAudioProcessor::createParameterLayout()
+{
+    std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "FREQ", "Frequency",
+        juce::NormalisableRange<float>(20.f, 2000.f, 0.01f, 0.5f), 440.f));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "GAIN", "Gain",
+        juce::NormalisableRange<float>(0.f, 1.f, 0.01f), 0.5f));
+
+    return { params.begin(), params.end() };
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()

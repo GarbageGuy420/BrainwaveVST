@@ -14,6 +14,10 @@ public:
 
 private:
     BrainwaveVSTAudioProcessor& audioProcessor;
+    juce::Slider frequencySlider;
+    juce::Slider gainSlider;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> frequencyAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> gainAttachment;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (BrainwaveVSTAudioProcessorEditor)
 };
